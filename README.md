@@ -59,11 +59,11 @@ Phần dưới đây là logic dự kiến triển khai; hiện chưa có firmwa
 
 ### Demo hệ thống
 
-![Demo](./image/demo.gif)
+![Demo](./cv-software/image/demo.gif)
 
 ### Mạch điều khiển và khung camera
 
-![Mạch STM32 và khung pan-tilt](./image/img.png)
+![Mạch STM32 và khung pan-tilt](./cv-software/image/img.png)
 
 ## 6. Lưu ý về bản quyền
 - ** Dự án được thực hiện nhằm mục đích học tập và nghiên cứu, không sử dụng cho mục đích thương mại. Quyền sở hữu và điều khoản cấp phép của các thư viện, mô hình và tài nguyên bên thứ ba vẫn thuộc về tác giả hoặc đơn vị cung cấp tương ứng. ** -
