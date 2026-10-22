@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "UART-Adapter-STM32",
+			"path": "UART-Adapter-STM32"
+		}
+	],
+	"settings": {}
+}
