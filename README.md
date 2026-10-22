@@ -25,7 +25,7 @@ Dự án sử dụng Python và YOLO để phát hiện khuôn mặt qua webcam.
 | USB–UART TX → STM32 RX | PA10 |
 | GND | Nối chung GND giữa các thiết bị |
 
-**Lưu ý:** Đây là sơ đồ chân dự kiến theo tài liệu hiện có, chưa đối chiếu được với firmware STM32. Servo cần nguồn ngoài đúng điện áp và đủ dòng theo thông số của mẫu servo thực tế; không lấy nguồn servo trực tiếp từ chân GPIO. Nối chung GND với STM32. Joystick dùng nguồn 3,3V để tín hiệu analog nằm trong giới hạn ADC.
+**Lưu ý:** Các chân GPIO có thể thay đổi tùy vào config trong STM32CubeMX, không cố định như mô tả hehe. Nối chung GND với STM32. Joystick dùng nguồn 3,3V để tín hiệu analog nằm trong giới hạn ADC.
 
 ## 2. Chức năng chính
 
@@ -39,13 +39,14 @@ Dự án sử dụng Python và YOLO để phát hiện khuôn mặt qua webcam.
 
 Quá trình xử lý trên máy tính gồm các bước:
 
-1. **Lấy hình ảnh:** đọc khung hình từ webcam và lật ngang bằng OpenCV.
-2. **Phát hiện khuôn mặt:** sử dụng mô hình `models/yolov11n-face.pt`, kích thước đầu vào `416` và ngưỡng tin cậy `0,5`. Chương trình ưu tiên CUDA nếu có GPU hỗ trợ, nếu không sẽ chạy trên CPU.
+1. **Lấy hình ảnh:** đọc khung hình từ webcam và lật các frame bằng OpenCV để không bị ngược trục điều khiển.
+2. **Phát hiện khuôn mặt:** sử dụng mô hình `models/yolov11n-face.pt`, kích thước đầu vào `416` và ngưỡng tin cậy `0,5`. Chương trình ưu tiên CUDA nếu có GPU NVIDIA hỗ trợ, nếu không sẽ chạy trên CPU.
 3. **Chọn mục tiêu:** ban đầu chọn khuôn mặt có độ tin cậy cao nhất. Ở các khung hình tiếp theo, ưu tiên khuôn mặt gần vị trí mục tiêu trước đó. Nếu mất mục tiêu trong 5 khung hình, chương trình cho phép chọn lại.
 4. **Tính góc điều khiển:** xác định độ lệch giữa tâm khuôn mặt và tâm khung hình theo từng trục. Độ lệch được làm mượt bằng bộ lọc trung bình mũ, sau đó đưa qua bộ điều khiển tỉ lệ để tính góc servo.
-5. **Giảm rung:** áp dụng vùng chết, giới hạn bước thay đổi góc và giữ góc servo trong khoảng `0–180°`. Lệnh điều khiển được cập nhật theo chu kỳ `0,1 giây` và chỉ gửi khi góc thay đổi ít nhất `1°`.
 
 YOLO chỉ được sử dụng để **phát hiện vị trí khuôn mặt**, không nhận dạng danh tính người xuất hiện trong hình.
+
+**Lưu ý:** Các thông số: PROPORTIONAL_GAIN, DEAD_ZONE_PIXELS, ERROR_ALPHA, MAX_STEP, CONTROL_INTERVAL cần hiệu chỉnh lại.
 
 ## 4. Điều khiển phía STM32
 
@@ -66,4 +67,4 @@ Phần dưới đây là logic dự kiến triển khai; hiện chưa có firmwa
 ![Mạch STM32 và khung pan-tilt](./cv-software/image/img.png)
 
 ## 6. Lưu ý về bản quyền
-- ** Dự án được thực hiện nhằm mục đích học tập và nghiên cứu, không sử dụng cho mục đích thương mại. Quyền sở hữu và điều khoản cấp phép của các thư viện, mô hình và tài nguyên bên thứ ba vẫn thuộc về tác giả hoặc đơn vị cung cấp tương ứng. ** -
+- **Dự án được thực hiện nhằm mục đích học tập và nghiên cứu, không sử dụng cho mục đích thương mại. Quyền sở hữu và điều khoản cấp phép của các thư viện, mô hình và tài nguyên bên thứ ba vẫn thuộc về tác giả hoặc đơn vị cung cấp tương ứng.**
