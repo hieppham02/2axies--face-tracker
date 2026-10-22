@@ -1,54 +1,69 @@
-# Hệ thống camera bám theo khuôn mặt
+# Face Tracker - Thiết bị nhận diện và tracking khuân mặt 2 trục XY
 
-## Mô tả ngắn gọn project
+Dự án sử dụng Python và YOLO để phát hiện khuôn mặt qua webcam. Từ vị trí khuôn mặt trong khung hình, chương trình tính toán góc quay và gửi lệnh qua UART đến STM32. Hai servo điều khiển camera theo phương ngang (X) và dọc (Y), giúp khuôn mặt luôn nằm giữa giữa khung hình. 
 
-Ứng dụng Python nhận diện khuôn mặt từ camera bằng YOLO, tính góc điều khiển và gửi đến STM32 qua serial. Hai servo xoay camera theo trục ngang (X) và dọc (Y), đưa khuôn mặt về giữa khung hình.
+## 1. Phần cứng và kết nối
 
-## Mô tả phần cứng, GPIO
+### Linh kiện sử dụng
 
-- **STM32F103C8T6 Blue Pill:** nhận lệnh điều khiển, đọc joystick và tạo PWM cho servo.
-- **2 servo MG99R:** điều khiển góc quay ngang và dọc của camera.
-- **Joystick 2 trục:** điều khiển camera thủ công qua hai tín hiệu analog VRx, VRy.
-- **Camera:** Webcam bình thường mua trên shopee
-- **PC:** (Ưu tiên PC có GPU NVIDIA) thu hình, chạy mô hình YOLO; kết nối STM32 qua bộ chuyển USB–UART.
-- **Khung in 3D:** [File STL](https://makerworld.com/en/models/973248-pan-tilt-servo-antenna-tracker-mg996r#profileId-945437)
+- **STM32F103C8T6 (Blue Pill):** nhận lệnh từ máy tính, đọc joystick và tạo tín hiệu PWM điều khiển servo.
+- **2 servo MG99R:** xoay camera theo hai trục X và Y.
+- **Joystick hai trục:** dùng để điều khiển camera thủ công qua hai tín hiệu analog VRx và VRy.
+- **Webcam USB:** cung cấp hình ảnh cho chương trình Python.
+- **Máy tính:** chạy YOLO và gửi lệnh điều khiển đến STM32 qua USB–UART. Ưu tiên máy có GPU NVIDIA để tăng tốc xử lý.
+- **Khung pan-tilt in 3D:** [Tham khảo mẫu STL trên MakerWorld](https://makerworld.com/en/models/973248-pan-tilt-servo-antenna-tracker-mg996r#profileId-945437).
 
-| Kết nối | GPIO |
+### Bảng kết nối dự kiến
+
+| Chức năng | Chân STM32 |
 | --- | --- |
-| Tín hiệu servo X, Y | PA7, PB1 |
-| Joystick VRx, VRy | PA4, PA5 |
-| USB–UART TX → STM32 RX | PA9 TX, PA10 RX |
-| GND các thiết bị | Chung GND |
+| PWM servo X | PA7 |
+| PWM servo Y | PB1 |
+| Joystick VRx | PA4 |
+| Joystick VRy | PA5 |
+| STM32 TX → USB–UART RX | PA9 |
+| USB–UART TX → STM32 RX | PA10 |
+| GND | Nối chung GND giữa các thiết bị |
 
-Servo sử dụng nguồn ngoài phù hợp (5V ~ 9V, > 1A), nối chung GND với STM32; joystick cấp 3,3 V để tín hiệu analog phù hợp với ADC. **Chưa có firmware STM32 trong thư mục này nên chưa xác định số chân GPIO cụ thể.**
+**Lưu ý:** Đây là sơ đồ chân dự kiến theo tài liệu hiện có, chưa đối chiếu được với firmware STM32. Servo cần nguồn ngoài đúng điện áp và đủ dòng theo thông số của mẫu servo thực tế; không lấy nguồn servo trực tiếp từ chân GPIO. Nối chung GND với STM32. Joystick dùng nguồn 3,3V để tín hiệu analog nằm trong giới hạn ADC.
 
-## Mô tả các chức năng
+## 2. Chức năng chính
 
-- Hiển thị camera, khung khuôn mặt, độ tin cậy, sai lệch tâm và góc hai servo.
-- Tự động bám theo một khuôn mặt qua hai trục X/Y.
-- Chọn cổng COM, chuyển camera giữa chỉ số 0 và 2.
-- Điều chỉnh hệ số điều khiển, vùng chết, hệ số lọc và bước góc tối đa trên giao diện.
-- Khi mất khuôn mặt, dừng gửi góc bám mới.
+- Hiển thị hình ảnh camera cùng khung phát hiện khuôn mặt, độ tin cậy và độ lệch so với tâm ảnh.
+- Tự động điều chỉnh hai servo để bám theo một khuôn mặt.
+- Chọn cổng COM và chuyển đổi giữa camera có chỉ số `0` và `2`.
+- Thay đổi hệ số điều khiển, vùng chết, hệ số lọc và bước thay đổi góc tối đa ngay trên giao diện.
+- Ngừng gửi lệnh cập nhật góc bám khi không còn phát hiện được khuôn mặt.
 
-## Mô tả thuật toán, ứng dụng mô hình YOLO
+## 3. Phát hiện và bám theo khuôn mặt bằng YOLO
 
-1. Đọc và lật ngang khung hình bằng OpenCV.
-2. Chạy mô hình `models/yolov11n-face.pt` với kích thước suy luận 416, ngưỡng tin cậy 0,5; dùng GPU CUDA nếu có, nếu không dùng CPU.
-3. Ban đầu chọn khuôn mặt có độ tin cậy cao nhất; các khung hình tiếp theo ưu tiên khuôn mặt gần vị trí trước đó. Sau 5 khung hình mất mục tiêu, cho phép chọn lại.
-4. Tính sai lệch giữa tâm khuôn mặt và tâm ảnh cho từng trục. Lọc sai lệch bằng trung bình mũ, áp dụng điều khiển tỉ lệ để tăng/giảm góc servo.
-5. Dùng vùng chết để giảm rung, giới hạn bước góc và góc trong khoảng 0–180°. Chu kỳ cập nhật điều khiển là 0,1 giây; chỉ gửi khi góc thay đổi ít nhất 1°.
+Quá trình xử lý trên máy tính gồm các bước:
 
-Mô hình phát hiện vị trí khuôn mặt, không nhận dạng danh tính.
+1. **Lấy hình ảnh:** đọc khung hình từ webcam và lật ngang bằng OpenCV.
+2. **Phát hiện khuôn mặt:** sử dụng mô hình `models/yolov11n-face.pt`, kích thước đầu vào `416` và ngưỡng tin cậy `0,5`. Chương trình ưu tiên CUDA nếu có GPU hỗ trợ, nếu không sẽ chạy trên CPU.
+3. **Chọn mục tiêu:** ban đầu chọn khuôn mặt có độ tin cậy cao nhất. Ở các khung hình tiếp theo, ưu tiên khuôn mặt gần vị trí mục tiêu trước đó. Nếu mất mục tiêu trong 5 khung hình, chương trình cho phép chọn lại.
+4. **Tính góc điều khiển:** xác định độ lệch giữa tâm khuôn mặt và tâm khung hình theo từng trục. Độ lệch được làm mượt bằng bộ lọc trung bình mũ, sau đó đưa qua bộ điều khiển tỉ lệ để tính góc servo.
+5. **Giảm rung:** áp dụng vùng chết, giới hạn bước thay đổi góc và giữ góc servo trong khoảng `0–180°`. Lệnh điều khiển được cập nhật theo chu kỳ `0,1 giây` và chỉ gửi khi góc thay đổi ít nhất `1°`.
 
-## Mô tả thuật toán, logic phía STM32
+YOLO chỉ được sử dụng để **phát hiện vị trí khuôn mặt**, không nhận dạng danh tính người xuất hiện trong hình.
 
-Phần dưới mô tả logic cần triển khai; chưa được xác minh bằng firmware trong thư mục này:
+## 4. Điều khiển phía STM32
 
-- **Tự động:** nhận từng dòng UART ở 115200 baud. Lệnh `90\n` đặt góc trục X là 90°; `Y:90\n` đặt góc trục Y là 90°. Phân tích lệnh, kiểm tra góc hợp lệ rồi cập nhật độ rộng xung PWM cho servo tương ứng.
-- **Thủ công:** đọc ADC của hai trục joystick, đặt vùng chết quanh vị trí giữa và chuyển độ lệch thành điều chỉnh góc servo.
-- Cần quy định cách chọn chế độ và ưu tiên giữa joystick với lệnh UART trong firmware.
+Phần dưới đây là logic dự kiến triển khai; hiện chưa có firmware STM32 trong tài liệu để kiểm chứng:
 
-## Ảnh, video demo
+- **Chế độ tự động:** nhận lệnh UART ở tốc độ `115200 baud`, kiểm tra giá trị góc rồi cập nhật xung PWM cho servo tương ứng. Ví dụ: `90\n` đặt góc trục X là `90°`, còn `Y:90\n` đặt góc trục Y là `90°`.
+- **Chế độ thủ công:** đọc ADC từ hai trục joystick, áp dụng vùng chết quanh vị trí trung tâm và chuyển độ lệch thành thay đổi góc servo.
+- **Chuyển chế độ:** firmware cần quy định cách chuyển giữa điều khiển bằng joystick và bằng UART, tránh hai nguồn lệnh cùng tác động đến servo.
 
-![Demo](images/demo.gif)
-![Board and Frame](images/img.jpg)
+## 5. Hình ảnh và video demo
+
+### Demo hệ thống
+
+![Demo](./image/demo.gif)
+
+### Mạch điều khiển và khung camera
+
+![Mạch STM32 và khung pan-tilt](./image/img.jpg)
+
+## 6. Lưu ý về bản quyền
+- ** Dự án được thực hiện nhằm mục đích học tập và nghiên cứu, không sử dụng cho mục đích thương mại. Quyền sở hữu và điều khoản cấp phép của các thư viện, mô hình và tài nguyên bên thứ ba vẫn thuộc về tác giả hoặc đơn vị cung cấp tương ứng. ** -
